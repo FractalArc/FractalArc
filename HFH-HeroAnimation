@@ -1,0 +1,618 @@
+<!-- HEALTH FOOD HISTORY – FLOATING ECCENTRICS HERO (PATCH v2) -->
+<!-- Key change vs prior: clip-path instead of overflow:hidden+border-radius to eliminate synchronized flicker -->
+
+<style>
+  :root {
+    --hfh-masonry-height-desktop: 320px;
+    --hfh-masonry-height-tablet: 260px;
+    --hfh-masonry-height-mobile: 220px;
+
+    --hfh-tile-radius: 18px;
+    --hfh-tile-border-width: 2px;
+    --hfh-tile-border-color: #ffffff;
+    --hfh-tile-shadow: none;
+
+    --hfh-scale-front: 1.08;
+    --hfh-scale-mid: 1.0;
+    --hfh-scale-back: 0.92;
+
+    --hfh-speed-min: 14;
+    --hfh-speed-max: 22;
+
+    --hfh-drop-scale: 1.08;
+    --hfh-drop-distance: 162%;
+    --hfh-drop-duration: 720ms;
+    --hfh-drop-ease: cubic-bezier(0.16, 0.75, 0.3, 1);
+
+    --hfh-label-font-size: 9px;
+    --hfh-label-font-size-mobile: 7px;
+    --hfh-label-letter-spacing: 0.09em;
+    --hfh-label-color: #444444;
+    --hfh-label-bg: rgba(255, 255, 255, 0.95);
+    --hfh-label-padding-y: 2px;
+    --hfh-label-padding-x: 9px;
+
+    --hfh-label-font-family-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --hfh-label-font-family-serif: "Georgia", "Times New Roman", serif;
+    --hfh-label-font-family: var(--hfh-label-font-family-sans);
+  }
+
+  .hfh-masonry-hero {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    margin: 0 auto;
+
+    /* IMPORTANT: remove overflow-hidden clipping */
+    overflow: visible;
+    border-radius: 0;
+
+    /* Clip children via clip-path instead */
+    -webkit-clip-path: inset(0 round 999px 999px 0 0);
+    clip-path: inset(0 round 999px 999px 0 0);
+
+    /* compositor hardening */
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    isolation: isolate;
+
+    /* Safari/WebKit “mask nudge” sometimes helps too */
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+  }
+
+  .hfh-masonry-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: var(--hfh-masonry-height-desktop);
+    overflow: visible;
+    background: transparent;
+  }
+
+  .hfh-masonry-grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: auto;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  .hfh-tile {
+    position: absolute;
+    top: 0;
+    left: 0;
+
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+    backface-visibility: hidden;
+
+    cursor: pointer;
+    opacity: 1;
+  }
+
+  .hfh-depth-front { z-index: 3; }
+  .hfh-depth-mid   { z-index: 2; }
+  .hfh-depth-back  { z-index: 1; }
+
+  .hfh-tile-inner {
+    position: relative;
+    width: 100%;
+    height: auto;
+    border-radius: var(--hfh-tile-radius);
+    border: var(--hfh-tile-border-width) solid var(--hfh-tile-border-color);
+    overflow: visible;
+    background: #fff;
+    box-shadow: var(--hfh-tile-shadow);
+    transform-origin: center center;
+  }
+
+  .hfh-depth-front .hfh-tile-inner { transform: scale(var(--hfh-scale-front)); }
+  .hfh-depth-mid   .hfh-tile-inner { transform: scale(var(--hfh-scale-mid)); }
+  .hfh-depth-back  .hfh-tile-inner { transform: scale(var(--hfh-scale-back)); }
+
+  .hfh-tile-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 360ms ease;
+  }
+  .hfh-tile-img.is-ready { opacity: 1; }
+
+  .hfh-tile-label {
+    position: absolute;
+    left: 50%;
+    bottom: -0.6em;
+    transform: translateX(-50%);
+    padding: var(--hfh-label-padding-y) var(--hfh-label-padding-x);
+    font-family: var(--hfh-label-font-family);
+    font-size: var(--hfh-label-font-size);
+    letter-spacing: var(--hfh-label-letter-spacing);
+    text-transform: uppercase;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    color: var(--hfh-label-color);
+    background: var(--hfh-label-bg);
+    border-radius: 999px;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .hfh-tile.is-dropping { pointer-events: none; }
+  .hfh-tile.is-dropping .hfh-tile-inner {
+    animation: hfh-drop var(--hfh-drop-duration) var(--hfh-drop-ease) forwards;
+  }
+
+  @keyframes hfh-drop {
+    0%   { transform: scale(1) translateY(0); opacity: 1; }
+    35%  { transform: scale(var(--hfh-drop-scale)) translateY(10%); }
+    100% { transform: scale(var(--hfh-drop-scale)) translateY(var(--hfh-drop-distance)); opacity: 0; }
+  }
+
+  @media (max-width: 991px) {
+    .hfh-masonry-inner { min-height: var(--hfh-masonry-height-tablet); }
+  }
+  @media (max-width: 767px) {
+    .hfh-masonry-inner { min-height: var(--hfh-masonry-height-mobile); }
+    .hfh-tile-label { font-size: var(--hfh-label-font-size-mobile); }
+  }
+</style>
+
+<div class="hfh-masonry-hero" aria-label="Eccentrics, fanatics &amp; visionaries">
+  <div class="hfh-masonry-inner">
+    <div class="hfh-masonry-grid" data-hfh-float-field></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const HFH_LABEL_SERIF = false;
+  const root = document.documentElement;
+  root.style.setProperty(
+    "--hfh-label-font-family",
+    HFH_LABEL_SERIF ? "var(--hfh-label-font-family-serif)" : "var(--hfh-label-font-family-sans)"
+  );
+
+  // Turn this on briefly if flicker persists: it logs if opacity/visibility is being changed externally.
+  const DEBUG_WATCHDOG = false;
+
+  const CONFIG = {
+    tiles: [
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/692e15d902bef64d63a5ac25_Adelle-Davis-Milk_300x.jpg", alt: "Adelle Davis" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/690ec56ccfd73c1db9da6030_Screenshot%202025-11-07%20145827.png", alt: "Arnold Ehret" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/690e6c7d50cea295fa440717_Screenshot%202025-11-07%20145958.png", alt: "John Harvey Kellogg" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/690ec7df3ea129f81ab05ceb_Screenshot%202025-11-07%20211526.png", alt: "Jethro Kloss" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/692cd77410efd62e0bd52810_John%20Mackey.jpg", alt: "John Mackey" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/690ec7e0a46f825e3835fdf1_Screenshot%202025-11-07%20211449.png", alt: "Paul Bragg" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/690ec7e1745dea323fd4f042_Screenshot%202025-11-07%20211350.png", alt: "Rachel Carson" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/690ec7e0d5a0f59942ce2aad_Screenshot%202025-11-07%20211629.png", alt: "James Irving Rodale" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/690ec7e18d5c4e24947a9399_Screenshot%202025-11-07%20211424.png", alt: "Linus Pauling" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/690ec7e10b0940fe98cbeea0_Screenshot%202025-11-07%20211546.png", alt: "Helen & Scott Nearing" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/690f802a238bf7a492b8915a_Screenshot%202025-11-08%20103645.png", alt: "Henry David Thoreau" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/690ec7e13deaf77ce569c04a_Screenshot%202025-11-07%20211604.png", alt: "Frances Moore Lappe" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/692f705f4fd5733841617c1b_Screenshot%202025-12-02%20155513.png", alt: "Royal Lee" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/690ec7e1442926c9728c111b_Screenshot%202025-11-07%20211639.png", alt: "Edgar Cayce" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/692f703c75cb3ddc1ad7c53a_Screenshot%202025-12-02%20155605.png", alt: "Bernarr Macfadden" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/692f705a7f9ac5979a07be1b_Screenshot%202025-12-02%20155617.png", alt: "Weston Price" },
+      { src: "https://cdn.prod.website-files.com/68a8f201696d2080ae884d55/695d930a03952a6508a13ce4_dick%20gregory%20photo.jpg", alt: "Dick Gregory" },
+      { src: "https://cdn.prod.website-files.com/68a8eea9da8668010e349b26/690ec7e1550adb97c4a54ff8_Screenshot%202025-11-07%20211434.png", alt: "John Robbins" }
+    ],
+
+    maxActive: 3,
+    minWidthPct: 12,
+    maxWidthPct: 16,
+    maxEdgeOverlap: 0.18,
+    sideMarginPct: 12,
+    spawnStaggerMs: 650
+  };
+
+  const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  const field = document.querySelector("[data-hfh-float-field]");
+  if (!field || !CONFIG.tiles.length) return;
+
+  let W = 1, H = 1;
+  const measure = () => {
+    const r = field.getBoundingClientRect();
+    W = r.width || 1;
+    H = r.height || 1;
+  };
+  measure();
+  const ro = new ResizeObserver(measure);
+  ro.observe(field);
+
+  const hero = field.closest(".hfh-masonry-hero");
+  const grid = field;
+
+  if (DEBUG_WATCHDOG && hero && grid) {
+    let lastSig = "";
+    const watchdog = () => {
+      const hs = getComputedStyle(hero);
+      const gs = getComputedStyle(grid);
+      const sig = [
+        hs.opacity, hs.visibility, hs.display, hs.filter, hs.transform,
+        gs.opacity, gs.visibility, gs.display, gs.filter, gs.transform
+      ].join("|");
+      if (sig !== lastSig) {
+        console.log("[HFH WATCHDOG] style changed:", sig);
+        lastSig = sig;
+      }
+      requestAnimationFrame(watchdog);
+    };
+    requestAnimationFrame(watchdog);
+  }
+
+  const cs = getComputedStyle(root);
+  const SCALE = {
+    front: parseFloat(cs.getPropertyValue("--hfh-scale-front")) || 1.08,
+    mid:   parseFloat(cs.getPropertyValue("--hfh-scale-mid")) || 1.0,
+    back:  parseFloat(cs.getPropertyValue("--hfh-scale-back")) || 0.92
+  };
+  const SPEED_MIN = parseFloat(cs.getPropertyValue("--hfh-speed-min")) || 14;
+  const SPEED_MAX = parseFloat(cs.getPropertyValue("--hfh-speed-max")) || 22;
+
+  const cache = new Map();
+  function decodeSafe(img) {
+    if (!img.decode) return Promise.resolve();
+    return img.decode().catch(() => {});
+  }
+  function makeShort(alt) {
+    const parts = (alt || "").trim().split(/\s+/);
+    return parts.length ? parts[parts.length - 1] : (alt || "");
+  }
+  function isMobile() {
+    const w = window.innerWidth || document.documentElement.clientWidth || 1024;
+    return w <= 767;
+  }
+
+  function preloadOne(tile) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.decoding = "async";
+      img.loading = "eager";
+      img.onload = async () => {
+        await decodeSafe(img);
+        const aspect = (img.naturalHeight > 0) ? (img.naturalWidth / img.naturalHeight) : 0.75;
+        cache.set(tile.src, { aspect, ok: true });
+        resolve({ ...tile, aspect, shortLabel: makeShort(tile.alt) });
+      };
+      img.onerror = () => {
+        cache.set(tile.src, { aspect: 0.75, ok: false });
+        resolve({ ...tile, aspect: 0.75, shortLabel: makeShort(tile.alt) });
+      };
+      img.src = tile.src;
+    });
+  }
+
+  let tilesWithMeta = [];
+  let unseen = [];
+  let recycle = [];
+
+  function shuffleInPlace(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+  }
+
+  function allIdx() { return tilesWithMeta.map((_, i) => i); }
+
+  function pickIndex(excludeSet) {
+    const pickFrom = (pool) => {
+      for (let i = 0; i < pool.length; i++) {
+        const idx = pool[i];
+        if (!excludeSet.has(idx)) {
+          pool.splice(i, 1);
+          return idx;
+        }
+      }
+      return null;
+    };
+
+    let idx = pickFrom(unseen);
+    if (idx !== null) return idx;
+
+    if (!recycle.length) {
+      recycle = allIdx();
+      shuffleInPlace(recycle);
+    }
+    idx = pickFrom(recycle);
+    if (idx !== null) return idx;
+
+    const opts = allIdx().filter(i => !excludeSet.has(i));
+    return opts.length ? opts[Math.floor(Math.random() * opts.length)] : 0;
+  }
+
+  function pickDepth() {
+    const r = Math.random();
+    if (r < 0.34) return "front";
+    if (r < 0.80) return "mid";
+    return "back";
+  }
+  function depthClass(depth) {
+    return depth === "front" ? "hfh-depth-front" : depth === "back" ? "hfh-depth-back" : "hfh-depth-mid";
+  }
+
+  const states = [];
+  const resetQueue = [];
+  let resetsThisFrame = 0;
+
+  function pickLeftPct(effWidthPct, selfState) {
+    const side = CONFIG.sideMarginPct || 0;
+    const minLeft = side;
+    const maxLeft = 100 - side - effWidthPct;
+    if (maxLeft <= minLeft) return minLeft;
+
+    const maxOverlap = CONFIG.maxEdgeOverlap ?? 0.18;
+    const attempts = 70;
+    const existing = states.filter(s => s !== selfState && s.index !== null);
+
+    function worstScore(left) {
+      const right = left + effWidthPct;
+      let worst = 0;
+      for (const s of existing) {
+        const l2 = s.leftPctEff;
+        const r2 = l2 + s.widthPctEff;
+        const overlap = Math.max(0, Math.min(right, r2) - Math.max(left, l2));
+        if (overlap <= 0) continue;
+
+        const minSpan = Math.min(effWidthPct, s.widthPctEff);
+        const overlapRatio = overlap / minSpan;
+        if (overlapRatio > maxOverlap) return 999;
+        worst = Math.max(worst, overlapRatio / Math.max(0.0001, maxOverlap));
+      }
+      return worst;
+    }
+
+    let bestLeft = minLeft;
+    let bestScore = Infinity;
+
+    for (let i = 0; i < attempts; i++) {
+      const left = minLeft + Math.random() * (maxLeft - minLeft);
+      const score = worstScore(left);
+      if (score < bestScore) {
+        bestScore = score;
+        bestLeft = left;
+        if (score === 0) break;
+      }
+    }
+
+    if (bestScore >= 999) {
+      const lanes = 9;
+      for (let k = 0; k < lanes; k++) {
+        const left = minLeft + (k / (lanes - 1)) * (maxLeft - minLeft);
+        if (worstScore(left) < 999) return left;
+      }
+      return bestLeft;
+    }
+
+    return bestLeft;
+  }
+
+  function createTileState() {
+    const tileEl = document.createElement("div");
+    tileEl.className = "hfh-tile";
+
+    const inner = document.createElement("div");
+    inner.className = "hfh-tile-inner";
+
+    const img = document.createElement("img");
+    img.className = "hfh-tile-img";
+    img.decoding = "async";
+    img.loading = "eager";
+    img.alt = "";
+
+    const label = document.createElement("div");
+    label.className = "hfh-tile-label";
+
+    inner.appendChild(img);
+    inner.appendChild(label);
+    tileEl.appendChild(inner);
+    field.appendChild(tileEl);
+
+    const state = {
+      el: tileEl,
+      inner,
+      img,
+      label,
+      index: null,
+      depth: "mid",
+      widthPct: 0,
+      widthPctEff: 0,
+      leftPct: 0,
+      leftPctEff: 0,
+      heightPx: 0,
+      yPx: 0,
+      speedPxMs: 0,
+      delayMs: 0,
+      dropping: false
+    };
+
+    tileEl.addEventListener("click", () => triggerDrop(state));
+    tileEl.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter" || evt.key === " ") {
+        evt.preventDefault();
+        triggerDrop(state);
+      }
+    });
+    tileEl.setAttribute("role", "button");
+    tileEl.setAttribute("tabindex", "0");
+
+    return state;
+  }
+
+  function setLabelText(state) {
+    const tile = tilesWithMeta[state.index];
+    if (!tile) return;
+    state.label.textContent = isMobile() ? (tile.shortLabel || tile.alt || "") : (tile.alt || "");
+  }
+
+  function swapToIndex(state, newIndex) {
+    const tile = tilesWithMeta[newIndex];
+    if (!tile) return;
+
+    state.index = newIndex;
+    setLabelText(state);
+
+    state.depth = pickDepth();
+    state.el.classList.remove("hfh-depth-front", "hfh-depth-mid", "hfh-depth-back");
+    state.el.classList.add(depthClass(state.depth));
+
+    const targetSrc = tile.src;
+    const currentAbs = state.img.currentSrc || state.img.src || "";
+    const nextAbs = new URL(targetSrc, location.href).href;
+
+    if (currentAbs === nextAbs) {
+      state.img.classList.add("is-ready");
+      return;
+    }
+
+    const buffer = new Image();
+    buffer.decoding = "async";
+    buffer.loading = "eager";
+    buffer.src = targetSrc;
+
+    buffer.onload = async () => {
+      await decodeSafe(buffer);
+      state.img.classList.remove("is-ready");
+      state.img.src = targetSrc;
+      state.img.alt = tile.alt || "";
+
+      const markReady = () => state.img.classList.add("is-ready");
+      if (state.img.complete && state.img.naturalWidth > 0) {
+        requestAnimationFrame(markReady);
+      } else {
+        const once = () => {
+          state.img.removeEventListener("load", once);
+          markReady();
+        };
+        state.img.addEventListener("load", once);
+      }
+    };
+
+    buffer.onerror = () => {
+      state.img.classList.add("is-ready");
+    };
+  }
+
+  function resetTile(state, opts = {}) {
+    if (typeof state.index === "number") recycle.push(state.index);
+
+    const exclude = new Set(states.filter(s => s !== state).map(s => s.index).filter(i => typeof i === "number"));
+    const idx = pickIndex(exclude);
+    swapToIndex(state, idx);
+
+    const tile = tilesWithMeta[idx];
+    const aspect = tile?.aspect || 0.75;
+
+    const widthPct = CONFIG.minWidthPct + Math.random() * (CONFIG.maxWidthPct - CONFIG.minWidthPct);
+    const scale = state.depth === "front" ? SCALE.front : state.depth === "back" ? SCALE.back : SCALE.mid;
+
+    const widthPctEff = widthPct * scale;
+    const leftPctEff = pickLeftPct(widthPctEff, state);
+    const leftPct = leftPctEff;
+
+    const widthPx = (widthPct / 100) * W;
+    const heightPx = widthPx / aspect;
+
+    const startBand = Math.max(120, H * 0.9);
+    const yStart = -heightPx - Math.random() * startBand;
+
+    const speedSeconds = SPEED_MIN + Math.random() * (SPEED_MAX - SPEED_MIN);
+    const speedPxMs = (H + heightPx * 2) / (speedSeconds * 1000);
+
+    state.widthPct = widthPct;
+    state.widthPctEff = widthPctEff;
+    state.leftPct = leftPct;
+    state.leftPctEff = leftPctEff;
+    state.heightPx = heightPx;
+    state.yPx = yStart;
+    state.speedPxMs = speedPxMs;
+    state.dropping = false;
+
+    state.delayMs = opts.staggerMs ?? 0;
+
+    state.el.style.width = widthPct + "%";
+    state.el.style.left = leftPct + "%";
+    state.el.style.transform = `translate3d(0, ${yStart}px, 0)`;
+  }
+
+  function triggerDrop(state) {
+    if (state.dropping) return;
+    state.dropping = true;
+    state.el.classList.add("is-dropping");
+
+    const handleEnd = () => {
+      state.inner.removeEventListener("animationend", handleEnd);
+      state.el.classList.remove("is-dropping");
+      resetQueue.push({ state, opts: { staggerMs: CONFIG.spawnStaggerMs } });
+      state.dropping = false;
+    };
+
+    state.inner.addEventListener("animationend", handleEnd);
+  }
+
+  let last = performance.now();
+  function tick(now) {
+    const dtRaw = now - last;
+    last = now;
+    const dt = Math.max(0, Math.min(34, dtRaw));
+
+    resetsThisFrame = 0;
+    if (resetQueue.length && resetsThisFrame < 1) {
+      const job = resetQueue.shift();
+      if (job?.state) {
+        resetTile(job.state, job.opts || {});
+        resetsThisFrame++;
+      }
+    }
+
+    if (!prefersReducedMotion) {
+      for (const s of states) {
+        if (s.dropping) continue;
+
+        if (s.delayMs > 0) {
+          s.delayMs -= dt;
+          continue;
+        }
+
+        s.yPx += s.speedPxMs * dt;
+
+        if (s.yPx > H + s.heightPx) {
+          if (!resetQueue.some(j => j.state === s)) {
+            resetQueue.push({ state: s, opts: { staggerMs: CONFIG.spawnStaggerMs } });
+          }
+        } else {
+          s.el.style.transform = `translate3d(0, ${s.yPx}px, 0)`;
+        }
+      }
+    }
+
+    requestAnimationFrame(tick);
+  }
+
+  (async function init() {
+    tilesWithMeta = await Promise.all(CONFIG.tiles.map(preloadOne));
+    unseen = allIdx();
+    shuffleInPlace(unseen);
+    recycle = [];
+
+    const count = Math.min(CONFIG.maxActive, tilesWithMeta.length);
+    for (let i = 0; i < count; i++) {
+      const s = createTileState();
+      states.push(s);
+      resetTile(s, { staggerMs: i * CONFIG.spawnStaggerMs });
+    }
+
+    window.addEventListener("resize", () => {
+      for (const s of states) setLabelText(s);
+    }, { passive: true });
+
+    requestAnimationFrame(tick);
+  })();
+})();
+</script>
